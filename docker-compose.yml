@@ -10,7 +10,7 @@ services:
   ports:
     - "8081:80"
   volumes:
-    - /var/www/ML/techChallengeML:/var/www/
+    - ./:/var/www/
   links:
     - mysql
     - redis
