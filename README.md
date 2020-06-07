@@ -6,6 +6,7 @@ El requerimiento del desafío se encuentra [aquí](tech_challenge.pdf).
 Para levantar este entorno hay que realizar los siguientes pasos:
 - docker-compose up
 - mv .env.example a .env
+- chmod -R 777 storage/
 - docker exec apiMLContainer "php artisan migrate && php artisan db:seed"
 - docker exec apiMLContainer "php artisan test" (opcional unit tests)
 
