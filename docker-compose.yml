@@ -1,0 +1,32 @@
+version: "2"
+
+services:
+ api:
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: api_ml
+  container_name: "apiMLContainer"
+  ports:
+    - "8081:80"
+  volumes:
+    - /var/www/ML/techChallengeML:/var/www/
+  links:
+    - mysql
+    - redis
+
+ mysql:
+  image: mysql:5.7
+  container_name: "mysqlApiML"
+  ports:
+   - "3306:3306"
+  environment:
+   - MYSQL_ROOT_PASSWORD=root
+  volumes:
+   - ./docker/sql:/docker-entrypoint-initdb.d/:ro
+
+ redis:
+  image: redis:latest
+  container_name: "redisML"
+  ports:
+   - "6379:6379"
