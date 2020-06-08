@@ -18,7 +18,7 @@ class UserFinantialStatusResource extends JsonResource
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
-            'debt_amount' => $this->debt,
+            'balance' => $this->balance,
             'last_update' => (new Carbon($this->update_at))->format('Y-m-d H:i:s'),
         ];
     }

@@ -5,6 +5,7 @@ namespace Tests\Endpoints;
 use Tests\TestCase;
 use App\Models\Event;
 use App\Models\Charge;
+use App\Models\PaymentCharge;
 
 class ApiEventsTest extends TestCase
 {
@@ -69,6 +70,11 @@ class ApiEventsTest extends TestCase
         $responseData = json_decode($response->getContent(), true);
         \DB::beginTransaction();
         try {
+            $payCharge = PaymentCharge::find($responseData['id']);
+            if ($payCharge) {
+                PaymentCharge::findOrFail($payCharge->id)->delete();
+                $payCharge->payment->delete();
+            }
             Charge::where(['event_id' => $responseData['id']])->delete();
             Event::findOrFail($responseData['id'])->delete();
         } catch (Exception $e) {

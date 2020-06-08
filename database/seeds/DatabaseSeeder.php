@@ -40,9 +40,9 @@ class DatabaseSeeder extends Seeder
             }
             for($i = 0; $i <= 1000; $i++) {
                 $paymentService = app('App\Services\PaymentService');
-                $payAmount = rand(100000, 300000)/100;
+                $payAmount = rand(100000, 30000)/100;
                 $payUser = rand(1, 10);
-                $paymentService->createFromBulk($payAmount, $payUser);
+                $paymentService->create($payAmount, $payUser);
             }
             $invoiceService = app('App\Services\InvoiceService');
             $invoiceService->consolidate($month);

@@ -4,21 +4,25 @@ namespace App\Services;
 use App\Http\Resources\UserFinantialStatusResource;
 use App\Models\UserFinantialStatus;
 use App\Models\Charge;
+use App\Models\Payment;
 
 class UserFinantialStatusService {
 
 
     public function update($userId)
     {
-        $ChargeModel = new Charge();
-        $debtAmount = $ChargeModel
-            ->where('user_id', $userId)
-            ->where('debt_amount', '>', 0)
-            ->sum('debt_amount');
+        $debtAmount = Charge
+            ::where('user_id', $userId)
+            ->where('amount', '>', 0)
+            ->sum('amount');
+
+        $creditAmount = Payment
+            ::where('user_id', $userId)
+            ->sum('amount');
 
         $UserFinantialStatus = UserFinantialStatus::firstOrNew(['user_id' => $userId]);
         $UserFinantialStatus->user_id = $userId;
-        $UserFinantialStatus->debt = $debtAmount;
+        $UserFinantialStatus->balance = $creditAmount - $debtAmount;
         $UserFinantialStatus->save();
     }
 

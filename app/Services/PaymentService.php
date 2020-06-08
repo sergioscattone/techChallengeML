@@ -13,10 +13,6 @@ class PaymentService {
         if (empty($amount) || !is_numeric($amount) || empty($userId)) {
             throw new HttpException(400, 'missing parameters: you should have: amount, user_id. amount must be > 0');
         }
-        $debtAmount = UserFinantialStatus::where('user_id', $userId)->get()[0]['debt'];
-        if ($debtAmount < $amount) {
-            throw new HttpException(405, 'The payment ('.$amount.') must be less than the total debt ('.$debtAmount.')');
-        }
         $chargeModel = new Charge();
         $debtCharges = $chargeModel
             ->where('user_id', $userId)
@@ -27,6 +23,7 @@ class PaymentService {
         try {
             $paymentModel = app('App\Models\Payment');
             $paymentModel->amount = $amount;
+            $paymentModel->uncharged = $amount;
             $paymentModel->user_id = $userId;
             $paymentModel->save();
             $remAmount = $amount;
@@ -37,6 +34,7 @@ class PaymentService {
                 $paymentChargeModel->save();
                 if ($debtCharge->debt_amount >= $remAmount) {
                     $debtCharge->debt_amount = $debtCharge->debt_amount - $remAmount;
+                    $remAmount = 0;
                     $debtCharge->save();
                     break;
                 } else {
@@ -45,6 +43,8 @@ class PaymentService {
                     $debtCharge->save();
                 }
             }
+            $paymentModel->uncharged = $remAmount;
+            $paymentModel->save();
             (new UserFinantialStatusService)->update($userId);
         } catch (Exception $e) {
             \DB::rollback();
@@ -54,14 +54,36 @@ class PaymentService {
         return new PaymentResource($paymentModel);
     }
 
-    public function createFromBulk($amount, $userId) {
-        try {
-            $this->create($amount, $userId);
-        } catch (HttpException $e) {
-            // overpayment dont stop the bulk
-            if ($e->getStatusCode() != 405) {
-                throw $e;
+    public function checkForUncharged($userId, $chargeModel) {
+        $paymentModel = Payment
+            ::where('user_id', $userId)
+            ->where('uncharged', '>', 0)
+            ->orderBy('id', 'ASC')
+            ->first();
+        if ($paymentModel) {
+            \DB::beginTransaction();
+            try {
+                $remAmount = $paymentModel->uncharged;
+                $paymentChargeModel = app('App\Models\PaymentCharge');
+                $paymentChargeModel->payment_id = $paymentModel->id;
+                $paymentChargeModel->charge_id = $chargeModel->id;
+                $paymentChargeModel->save();
+                if ($chargeModel->debt_amount >= $remAmount) {
+                    $chargeModel->debt_amount = $chargeModel->debt_amount - $remAmount;
+                    $remAmount = 0;
+                    $chargeModel->save();
+                } else {
+                    $remAmount -= $chargeModel->debt_amount;
+                    $chargeModel->debt_amount = 0;
+                    $chargeModel->save();
+                }
+                $paymentModel->uncharged = $remAmount;
+                $paymentModel->save();
+            } catch (Exception $e) {
+                \DB::rollback();
+                throw new HttpException(500, 'There was an error processing your payment');
             }
+            \DB::commit();
         }
     }
 

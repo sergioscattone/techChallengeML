@@ -19,6 +19,7 @@ class PaymentResource extends JsonResource
             'id' => $this->id,
             'user_id' => $this->user_id,
             'amount' => $this->amount,
+            'uncharged' => $this->uncharged,
             'date' => (new Carbon($this->created_at))->format('Y-m-d H:i:s'),
         ];
     }
