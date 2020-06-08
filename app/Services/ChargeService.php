@@ -3,6 +3,7 @@ namespace App\Services;
 
 use App\Http\Resources\ChargeResource;
 use App\Services\UserFinantialStatusService;
+use App\Services\PaymentService;
 use App\Models\Event;
 use App\Models\Charge;
 
@@ -16,6 +17,7 @@ class ChargeService {
         $chargeModel->user_id = $event->user_id;
         $chargeModel->event_id = $event->id;
         $chargeModel->save();
+        (new PaymentService)->checkForUncharged($event->user_id, $chargeModel);
         (new UserFinantialStatusService)->update($event->user_id);
         return $chargeModel;
     }

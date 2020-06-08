@@ -18,19 +18,20 @@ class UserFinantialStatusServiceTest extends TestCase
     public function testUpdate()
     {
         \DB::beginTransaction();
-        // adding debt without any charge
-        $usrFinStatus = UserFinantialStatus::findOrFail(1);
-        $originalDebt = $usrFinStatus->debt;
-        $usrFinStatus->debt += rand(1, 100);
+        // adding transaction without any charge
+        $usrFinStatus = (new UserFinantialStatus)->findOrFail(1);
+        $originalBalance = $usrFinStatus->balance;
+
+        $usrFinStatus->balance += rand(1, 10000);
         $usrFinStatus->save();
 
-        // update debt according to charges
+        // update transaction according to charges
         $usrFinStatusService = new UserFinantialStatusService();
         $usrFinStatusService->update($usrFinStatus->user_id);
 
-        // debt should be original debt
-        $usrFinStatus = UserFinantialStatus::findOrFail(1);
-        $this->assertEquals($usrFinStatus->debt, $originalDebt);
+        // balance should be original balance
+        $usrFinStatus = (new UserFinantialStatus)->findOrFail(1);
+        $this->assertEquals($usrFinStatus->balance, $originalBalance);
         \DB::commit();
     }
 

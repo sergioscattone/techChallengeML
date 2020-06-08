@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class UserFinantialStatus extends Model
 {
-    protected $fillable = ['debt'];
+    protected $fillable = ['balance'];
 
     public function user()
     {

@@ -69,13 +69,15 @@ class ApiPaymentsTest extends TestCase
         ])->post($endpoint, $postData);
         $response->assertStatus(200);
         $responseData = json_decode($response->getContent(), true);
-        $payCharge = PaymentCharge::findOrFail($responseData['id']);
         \DB::beginTransaction();
         try {
             Charge::where(['event_id' => $event->id])->delete();
             $event->delete();
-            PaymentCharge::findOrFail($payCharge->id)->delete();
-            $payCharge->payment->delete();
+            $payCharge = PaymentCharge::find($responseData['id']);
+            if ($payCharge) {
+                PaymentCharge::findOrFail($payCharge->id)->delete();
+                $payCharge->payment->delete();
+            }
         } catch (Exception $e) {
             \DB::rollback();
         }

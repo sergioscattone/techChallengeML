@@ -25,7 +25,8 @@ class IntegrationTest extends TestCase
             1 => Currency::findOrFail(1)->value,
             2 => Currency::findOrFail(2)->value,
         ];
-        $totalDebtAmount = 0;
+        $balance = 0;
+        $overPayment = 800;
         $chargeValues = [];
 
         // add 6 events with different charges
@@ -41,39 +42,56 @@ class IntegrationTest extends TestCase
             $this->assertEquals($event['user_id'], $user->id);
             $this->assertEquals($chargeDebtAmount, $chargeValues[$i]);
 
-            $totalDebtAmount += $chargeDebtAmount;
-            $userFinantialDebt = $this->getFinantialDebtAmount($user->id);
-            $this->assertEquals($totalDebtAmount, $userFinantialDebt['debt_amount']);
+            $balance -= $chargeDebtAmount;
+            $userFinantialBalance = $this->getFinantialBalance($user->id);
+            $this->assertEquals($balance, $userFinantialBalance['balance']);
         }
+
+        $this->assertEquals(-$balance, array_sum($chargeValues));
 
         // make 4 payments
         $paymentAmounts = [
-            $chargeValues[0] + $chargeValues[1], // shuold cancel first two charges
-            $chargeValues[2] + $chargeValues[3], // shuold cancel second two charges
-            $chargeValues[4] + 1, // shuold reject the payment because is 1 over the debt
+            $chargeValues[0] + $chargeValues[1], // should cancel first two charges
+            $chargeValues[2] + $chargeValues[3], // should cancel second two charges
+            $chargeValues[4] + $overPayment, // should reserve 800 for next charge/s
         ];
+
         for ($i = 0; $i< 2; $i++) {
             $payment = $this->makePayment($paymentAmounts[$i], $user->id);
             $this->assertEquals($payment['amount'], $paymentAmounts[$i]);
             $this->assertEquals($payment['user_id'], $user->id);
-            $userFinantialDebt = $this->getFinantialDebtAmount($user->id);
-            $totalDebtAmount -= $payment['amount'];
-            $this->assertEquals($totalDebtAmount, $userFinantialDebt['debt_amount']);
+            $userFinantialBalance = $this->getFinantialBalance($user->id);
+            $balance += $payment['amount'];
+            $this->assertEquals($balance, $userFinantialBalance['balance']);
         }
 
-        try {
-            $payment = $this->makePayment($paymentAmounts[2], $user->id);
-        } catch (Exception $e) {
-            $this->assertEquals($e->getStatusCode(), 405);
-        }
-
-        $payment = $this->makePayment($paymentAmounts[2]-1, $user->id);
-        $this->assertEquals($payment['amount'], $paymentAmounts[2]-1);
+        // overpayment as credit 800
+        $payment = $this->makePayment($paymentAmounts[2], $user->id);
+        $this->assertEquals($payment['amount'], $paymentAmounts[2]);
         $this->assertEquals($payment['user_id'], $user->id);
-        $userFinantialDebt = $this->getFinantialDebtAmount($user->id);
-        $totalDebtAmount -= $payment['amount'];
-        $this->assertEquals($totalDebtAmount, $userFinantialDebt['debt_amount']);
-        $this->assertEquals($totalDebtAmount, 0);
+        $userFinantialBalance = $this->getFinantialBalance($user->id);
+        $this->assertEquals($userFinantialBalance['balance'], $overPayment);
+        $balance += $payment['amount'];
+        $this->assertEquals($balance, $overPayment);
+
+        // create 2 new charges, one for the half of the overpayment
+        // and the other one for total, should create 3 chartes
+        // last one with 400 of debt_amount for pay
+        for($i=2; $i>0; $i--) {
+            $event = $this->addEvent($overPayment / $i, $user->id, 1, 1);
+            $this->assertEquals($event['amount'], $overPayment / $i);
+            $balance -= $event['amount'];
+            $userFinantialBalance = $this->getFinantialBalance($user->id);
+            $this->assertEquals($balance, $userFinantialBalance['balance']);
+        }
+
+        // debt should be -400
+        $charges = $this->getChargeDebtByUserID($user->id);
+        $totalDebt = 0;
+        foreach($charges as $charge) {
+            $totalDebt -= $charge['debt_amount'];
+        }
+        $this->assertEquals($totalDebt, $balance);
 
         \DB::beginTransaction();
         try {
@@ -130,7 +148,7 @@ class IntegrationTest extends TestCase
         return $respCharges[0]['debt_amount'];
     }
 
-    private function getFinantialDebtAmount($userId)
+    private function getFinantialBalance($userId)
     {
         $token = str_replace("base64:/", "", env("APP_KEY"));
         $endpoint = '/api/users/'.$userId.'/status';
@@ -152,6 +170,18 @@ class IntegrationTest extends TestCase
         $response = $this->withHeaders([
             'token' => $token,
         ])->post($endpoint, $postData);
+        return json_decode($response->getContent(), true);
+    }
+
+    private function getChargeDebtByUserID($userId)
+    {
+
+        $endpoint = '/api/charges';
+        $token = str_replace("base64:/", "", env("APP_KEY"));
+        $response = $this->call('GET', $endpoint, [
+            'token' => $token,
+            'user_id' => $userId
+        ]);
         return json_decode($response->getContent(), true);
     }
 }
